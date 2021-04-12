@@ -1,0 +1,126 @@
+gprh1
+edenhorka
+
+=============================
+=      File description     =
+=============================
+package filesprocessing:
+    package commands:
+        package filter:
+            FilterAll.java - filter that returns list of all files
+            FilterBetween.java - filter that returns list of files with size between a given range
+            FilterContains.java - filter that returns list of files that contains a given string in the name
+            FilterExecutable.java - filter that returns list of executable files
+            FilterFactory.java - factory for all filters, build the corresponding filter to a given command name
+            FilterFile.java - filter that returns list of files with a given name
+            FilterGreaterThan.java - filter that returns list of files with size greater than a given number
+            FilterHidden.java - filter that returns list of hidden files
+            FilterPrefix.java - filter that returns list of files with a given prefix
+            FilterSmallerThan.java - filter that returns list of files with size smaller than a given number
+            FilterSuffix.java - filter that returns list of files with a given prefix
+            FilterWritable.java - filter that returns list of writable files
+        package order:
+            OrderAbs.java - order list of files by absolute path
+            OrderFactory.java - factory for all orders, build the corresponding order to a given command name
+            OrderSize.java - order list of files by size
+            OrderType.java - order list of files by type name
+        package paramstypes:
+            DoubleType.java - holds and parses Double parameter type
+            GenericType.java - interface for parsable type
+            IndicatorType.java - holds and parses indicator of Yes No
+            NotType.java - holds and parses Not parameter
+            RangeType.java - holds and parses range of two Double parameters type
+            ReverseType.java - holds and parses Reverse parameter
+            StringType.java - holds and parses String parameter type
+            VoidType.java - holds and parses nothing
+        Command.java - abstract for command, provides methods for parsing and applying (doing the command)
+        Factory.java - abstract class of factory, holds hash table for pairing between command name to specific command instance
+        Filter.java - represent a filter command, build and holds specific filter
+        Order.java - represent a order command, build and holds specific order
+        Section.java - represent a section in a command file composed from Filter and Order
+        SpecificCommand.java - abstract class represent a command with generic parameters
+    package exceptions:
+        ExceptionErrorParser.java - error exception of parsing
+        ExceptionErrorParserInvalid.java - invalid command, subclass of error exception of parsing
+        ExceptionErrorParserMissing.java - Missing mandatory command, subclass of error exception of parsing
+        ExceptionWarningParser.java - warning exception of parsing
+    cmdFileParser.java - warps the command file, track the line number, every line is split by the separator "#"
+    DirectoryProcessor.java - holds the main, parsing a command file, print the output lists.
+
+
+=============================
+=          Design           =
+=============================
+
+              |--Section--|
+              |           |
+         <composed>  <composed>
+              |           |
+              |  Command  |
+              | /   |   \ |
+      |----Filter   |   Order------|
+      |             |              |
+      |     SpecificCommand        |
+      |     |             |        |
+      |     |             |        |
+      | FilterAbs...   OrderAll... |
+      |     ^              ^       |
+      |     |              |       |
+      | <composed>     <composed>  |
+ <composed> |   Factory    |  <composed>
+       \    |  /       \ <composed>/
+        \   | /         \  |      /
+       FilterFactory  OrderFactory
+
+Exception hierarchy:
+                     ExceptionErrorParser
+                    /                    \
+ ExceptionErrorParserInvalid    ExceptionErrorParserMissing
+
+ExceptionWarningParser
+
+=============================
+=  Implementation details   =
+=============================
+main guidelines:
+1) open-close concept:
+    we built a mechanism for parsing the command file,
+    adding new command is easy and requires only create new specific command and add it to the factory
+    using generics for parameters type at SpecificCommand
+    Factory handles all the logic, subclasses only initialized the inner data structures
+2) error handling:
+    error are handled by catching and throwing exceptions
+    some errors are handled by choosing default behaviour,
+    some are logged for later use,
+    and some are handled in the main and cause to shutdown the program
+    each class aware for the exception might be thrown, and choose rather to handle and rather to throw for the upper level
+3) Creating instances:
+    for all pre known instances composition, we chose to write explicitly- like Section that holds Order and Filter
+    for dynamic composition, we chose to use factory- like Filter using the FilterFactory
+
+Exceptions hierarchy:
+    (*) we separated between errors to warnings,
+    (*) we have 2 types of errors, and one type of warning.
+    (*) several errors are handled by lower level and some are thrown to top level
+    (*) like missing sub-command for Order, Order handling it by setting the OrderAbs, and throw warning to upper level
+    (*) warning are gathered at Section, the main function print them before the section output
+
+main flow:
+    (*) main is parsing the command file by creating and parsing sections
+        (*) Section parsing Filter and Order
+            (*) Filter parse itself, and parse specific filter command by using the FilterFactory
+                (*) if error occurred- setting sub-filter to be FilterAll, and throw exception to upper level
+                (*) specific filter parse itself and his parameters
+            (*) Order parse itself, and parse specific order command by using the OrderFactory
+                (*) if error occurred- setting sub-order to be OrderAbs, and throw exception to upper level
+                (*) specific order parse itself and his parameters
+            (*) if warning exception was caught, save warning message for later use
+    (*) if error occurred - display message and exit
+    (*) for each section:
+        (*) display the warning messages if exists
+        (*) on files list:
+            (*) apply section
+                (*) apply Filter
+                    (*) apply specific filter
+                (*) apply Order
+                    (*) apply specific order- using LinkedList and Collection.Sort with our defined Comparators
